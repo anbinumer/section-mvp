@@ -114,6 +114,20 @@ router.post('/course-data', createCanvasInstance, async (req, res) => {
       req.canvasAPI.getSections(courseId)
     ]);
 
+    // For each section, fetch students (enrollments of type StudentEnrollment)
+    for (const section of sections) {
+      try {
+        const enrollments = await req.canvasAPI.getSectionEnrollments(section.id);
+        section.students = enrollments
+          .filter(e => e.type === 'StudentEnrollment')
+          .map(e => ({ id: e.user_id, name: e.user?.name || e.sis_user_id || e.user_id }));
+        console.log(`[Section] ${section.id} - ${section.name}: ${enrollments.length} enrollments, ${section.students.length} students`);
+      } catch (e) {
+        section.students = [];
+        console.log(`[Section] ${section.id} - ${section.name}: failed to fetch enrollments (${e.message})`);
+      }
+    }
+
     console.log(`📈 Course data summary:
       - Students: ${students.length}
       - Facilitators: ${facilitators.length}
@@ -151,7 +165,8 @@ router.post('/course-data', createCanvasInstance, async (req, res) => {
           total_students: s.total_students || 0,
           sis_section_id: s.sis_section_id,
           integration_id: s.integration_id,
-          isToolCreated: req.canvasAPI.isToolCreatedSection(s)
+          isToolCreated: req.canvasAPI.isToolCreatedSection(s),
+          students: s.students || []
         }))
       },
       analysis,
@@ -217,7 +232,7 @@ router.post('/analyze-sections', createCanvasInstance, async (req, res) => {
           name: s.name,
           total_students: s.total_students || 0,
           sis_section_id: s.sis_section_id,
-          type: this.categorizeSection(s)
+          type: categorizeSection(s)
         }))
       },
       warnings: [],
