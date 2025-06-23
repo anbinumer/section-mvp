@@ -166,6 +166,102 @@ class CanvasAPI {
     }
   }
 
+  /**
+   * Get sections created by our tool (using SIS section ID prefix)
+   */
+  async getToolCreatedSections(courseId) {
+    try {
+      const allSections = await this.getSections(courseId);
+      return allSections.filter(section => 
+        this.isToolCreatedSection(section)
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get sections NOT created by our tool (default, manual, other tools)
+   */
+  async getNonToolSections(courseId) {
+    try {
+      const allSections = await this.getSections(courseId);
+      return allSections.filter(section => 
+        !this.isToolCreatedSection(section)
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a section was created by our tool
+   */
+  isToolCreatedSection(section) {
+    // Check SIS section ID prefix
+    if (section.sis_section_id && section.sis_section_id.startsWith('ACU_SM_')) {
+      return true;
+    }
+    
+    // Check integration ID for tool metadata
+    if (section.integration_id) {
+      try {
+        const metadata = JSON.parse(section.integration_id);
+        if (metadata.tool === 'ACU_Section_Manager') {
+          return true;
+        }
+      } catch (e) {
+        // Invalid JSON, not our section
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Generate SIS section ID for our tool
+   */
+  generateToolSectionId(sectionNumber, userId) {
+    const timestamp = Date.now();
+    const sessionId = Math.random().toString(36).substr(2, 9);
+    return `ACU_SM_${timestamp}_${sectionNumber}_${sessionId}`;
+  }
+
+  /**
+   * Generate integration ID with metadata
+   */
+  generateIntegrationId(userId, sessionId) {
+    return JSON.stringify({
+      tool: 'ACU_Section_Manager',
+      version: '1.0',
+      createdBy: userId,
+      timestamp: new Date().toISOString(),
+      sessionId: sessionId
+    });
+  }
+
+  /**
+   * Get sections by session ID (Canvas-only approach)
+   */
+  async getSectionsBySession(courseId, sessionId) {
+    try {
+      const allSections = await this.getSections(courseId);
+      return allSections.filter(section => {
+        if (section.integration_id) {
+          try {
+            const metadata = JSON.parse(section.integration_id);
+            return metadata.sessionId === sessionId;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async createSection(courseId, sectionData) {
     try {
       const response = await this.client.post(`/courses/${courseId}/sections`, {
@@ -309,4 +405,4 @@ class CanvasAPI {
   }
 }
 
-module.exports = CanvasAPI; 
+module.exports = CanvasAPI;

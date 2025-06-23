@@ -1,242 +1,219 @@
-# Canvas Section Manager
+# Canvas Section Manager - ACU
 
-A powerful web application that automates student allocation into Canvas LMS sections based on available facilitators, designed specifically for Australian Catholic University.
+A lightweight, **Canvas-only** section allocation tool for Australian Catholic University. This tool helps Editing Lecturers automatically allocate students into sections based on available Online Facilitators, with no external database dependencies.
 
-## 🎯 Purpose
+## 🎯 Features
 
-This tool helps **Editing Lecturers** automatically allocate students into sections in Canvas LMS courses based on the number of assigned **Online Facilitators**. It streamlines the manual process of creating sections and enrolling students, ensuring optimal facilitator-to-student ratios.
-
-## ✨ Features
-
-### Core Functionality
-- **Canvas Integration**: Secure API connection with Canvas LMS
-- **Role Validation**: Ensures only Editing Lecturers can use the tool
-- **Intelligent Analysis**: Analyzes course data and recommends optimal section distribution
-- **Flexible Allocation**: Multiple strategies for student distribution (balanced, alphabetical, random)
-- **Dual Naming**: Support for both internal (educator-facing) and external (student-facing) section names
-- **Audit Logging**: Complete tracking of all allocation activities
-
-### User Experience
-- **Step-by-Step Workflow**: Guided 4-step process from connection to execution
-- **Real-time Preview**: See allocation results before execution
-- **Progress Tracking**: Live updates during bulk operations
-- **Error Handling**: Comprehensive error messages and recovery options
-- **ACU Branding**: Professional UI with ACU color scheme and styling
-
-### Technical Features
-- **Rate Limiting**: Respects Canvas API limits with automatic throttling
-- **Bulk Operations**: Efficient handling of large courses
-- **Database Logging**: MongoDB storage for audit trails and rollback capability
-- **Security**: Helmet.js security headers and input validation
-- **Responsive Design**: Works on desktop and mobile devices
+- **Canvas-Native**: Uses only Canvas API - no external database required
+- **Safe Operations**: Only modifies sections created by this tool
+- **Rollback Capability**: Complete undo functionality for any allocation
+- **Smart Allocation**: 1:25 target ratio with 1:50 maximum override
+- **Section Differentiation**: Clear identification of tool-created vs other sections
+- **Real-time Progress**: Live updates during allocation process
 
 ## 🏗️ Architecture
 
-### Backend (Node.js + Express)
-- **Canvas API Service**: Comprehensive Canvas LMS integration
-- **Allocation Service**: Intelligent student distribution algorithms
-- **Database Models**: MongoDB schemas for sections and audit logs
-- **RESTful APIs**: Clean API endpoints for frontend communication
+### **Section Identification Strategies**
+1. **SIS Section ID Prefix**: `ACU_SM_{timestamp}_{sectionNumber}_{sessionId}`
+2. **Integration ID Metadata**: JSON metadata stored in Canvas integration_id field
+3. **Session-Based Operations**: All sections in an allocation share a session ID
 
-### Frontend (Vanilla JS + Tailwind CSS)
-- **Progressive Enhancement**: Works without JavaScript for basic functionality
-- **Modern UI**: Clean, card-based design with smooth animations
-- **Responsive Layout**: Mobile-first design approach
-- **Accessibility**: WCAG-compliant interface elements
+### **Safety Features**
+- **Tool-Created Sections**: Only sections with `ACU_SM_` prefix are modified
+- **Preserved Sections**: Default, manual, and other tool sections are untouched
+- **Session Isolation**: Rollback affects only sections from specific allocation
+- **Confirmation Dialogs**: Clear warnings before destructive operations
 
-### Database (MongoDB)
-- **Section Management**: Track created sections and their status
-- **Audit Logging**: Complete history of allocation operations
-- **Error Tracking**: Detailed error logs for troubleshooting
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 16+ and npm
-- MongoDB 4.4+
-- Canvas LMS account with Editing Lecturer permissions
-- Canvas API token
+- Node.js 16+ 
+- Canvas API access token
+- Editing Lecturer permissions in Canvas
 
 ### Installation
+```bash
+# Clone the repository
+git clone https://github.com/anbinumer/section-mvp.git
+cd section-mvp
 
-1. **Clone and install dependencies**
-   ```bash
-   git clone <repository-url>
-   cd section-mvp
-   npm install
-   ```
+# Install dependencies
+npm install
 
-2. **Configure environment**
-   ```bash
-   cp env.example .env
-   # Edit .env with your MongoDB connection string
-   ```
+# Copy environment template
+cp env.example .env
 
-3. **Start the application**
-   ```bash
-   # Development mode with auto-reload
-   npm run dev
-   
-   # Production mode
-   npm start
-   ```
+# Start the application
+npm start
+```
 
-4. **Access the application**
-   - Open http://localhost:3000 in your web browser
-   - Enter your Canvas URL, API token, and course ID
-   - Follow the guided workflow
+### Environment Variables
+```bash
+# Required
+PORT=3000
+NODE_ENV=development
 
-### Canvas API Token Setup
+# Optional
+INSTITUTION_NAME="Australian Catholic University"
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+```
 
-1. Log into your Canvas account
-2. Go to **Account → Settings**
-3. Scroll to **Approved Integrations**
-4. Click **+ New Access Token**
-5. Enter purpose: "Section Manager"
-6. Set expiry date (optional)
-7. Click **Generate Token**
-8. **Important**: Copy the token immediately - you won't see it again!
+## 📖 Usage
 
-## 📋 Usage Workflow
-
-### Step 1: Connect to Canvas
+### 1. Connect to Canvas
 - Enter your Canvas institution URL
 - Provide your Canvas API token
 - Specify the course ID
-- System validates credentials and permissions
 
-### Step 2: Analyze Course Data
+### 2. Analyze Course
 - Review student and facilitator counts
-- See existing sections
-- Get intelligent recommendations for optimal allocation
-- View warnings for potential issues
+- See existing sections (tool-created vs others)
+- Get allocation recommendations
 
-### Step 3: Configure Sections
-- Set number of sections to create
-- Define internal and external section names
-- Choose student distribution strategy
-- Generate and review allocation preview
+### 3. Configure Sections
+- Set number of sections needed
+- Configure internal and external names
+- Choose allocation strategy
 
-### Step 4: Execute Allocation
-- Review final allocation plan
-- Execute section creation and student enrollment
+### 4. Execute Allocation
+- Review the allocation plan
+- Execute the allocation
 - Monitor progress in real-time
-- View completion summary and audit log
+- Use rollback if needed
 
 ## 🔧 API Endpoints
 
-### Canvas Integration
+### Canvas Operations
 - `POST /api/canvas/validate` - Validate credentials and permissions
 - `POST /api/canvas/course-data` - Fetch comprehensive course data
-- `POST /api/canvas/test-connection` - Test Canvas connectivity
+- `POST /api/canvas/analyze-sections` - Analyze existing sections
 
 ### Section Management
 - `POST /api/sections/create-bulk` - Create multiple sections
-- `POST /api/sections/enroll-students` - Bulk student enrollment
-- `GET /api/sections/course/:courseId` - Get sections for a course
+- `POST /api/sections/rollback` - Rollback sections by session
+- `GET /api/sections/session/:sessionId` - Get session details
 
-### Allocation Management
-- `POST /api/allocations/analyze` - Analyze course for recommendations
-- `POST /api/allocations/generate-plan` - Create detailed allocation plan
-- `POST /api/allocations/execute` - Execute full allocation process
-- `GET /api/allocations/history/:courseId` - Get allocation history
+### Allocation Operations
+- `POST /api/allocations/analyze` - Analyze allocation requirements
+- `POST /api/allocations/generate-plan` - Generate allocation plan
+- `POST /api/allocations/execute` - Execute full allocation
 
-## 🛡️ Security Features
+## 🛡️ Safety & Rollback
 
+### Section Categorization
+```javascript
+// Tool-created sections (safe to modify)
+if (section.sis_section_id.startsWith('ACU_SM_')) { /* safe */ }
+
+// Preserved sections (never modified)
+- Default sections
+- SIS-imported sections  
+- Manually created sections
+- Sections from other tools
+```
+
+### Rollback Process
+1. **Session Identification**: Find sections by session ID
+2. **Safe Deletion**: Only delete tool-created sections
+3. **Student Cleanup**: Remove enrollments from deleted sections
+4. **Audit Trail**: Complete operation logging
+
+## 🎨 UI/UX
+
+- **ACU Branding**: Purple color scheme (#663399)
+- **Responsive Design**: Works on desktop and mobile
+- **Progress Indicators**: Clear step-by-step workflow
+- **Error Handling**: Graceful error messages and recovery
+- **Confirmation Dialogs**: Prevent accidental operations
+
+## 🔒 Security
+
+- **API Token Security**: Tokens never stored, only used for API calls
 - **Rate Limiting**: Prevents API abuse
-- **Input Validation**: All inputs sanitized and validated
-- **CORS Protection**: Configurable cross-origin resource sharing
-- **Security Headers**: Helmet.js for security hardening
-- **Error Handling**: Secure error messages without sensitive data exposure
+- **CORS Protection**: Secure cross-origin requests
+- **Input Validation**: All inputs validated and sanitized
+- **Error Sanitization**: Production-safe error messages
 
-## 📊 Allocation Strategies
+## 📊 Performance
 
-### Balanced (Default)
-- Evenly distributes students across all sections
-- Maintains consistent section sizes
-- Best for general use cases
+- **Canvas-Only**: No database queries, faster operations
+- **Bulk Operations**: Efficient batch processing
+- **Progress Tracking**: Real-time status updates
+- **API Optimization**: Minimal Canvas API calls
 
-### Alphabetical
-- Sorts students by name before distribution
-- Useful for creating alphabetically organized sections
-- Helps with administrative tasks
+## 🚀 Deployment
 
-### Random
-- Randomly shuffles students before allocation
-- Ensures unpredictable groupings
-- Good for avoiding pre-existing student clusters
-
-## 🔍 Monitoring & Logging
-
-- **Audit Trails**: Complete history of all allocation operations
-- **Error Tracking**: Detailed error logs with stack traces
-- **Performance Metrics**: API call counts and execution times
-- **Status Monitoring**: Real-time status of section creation and enrollment
-
-## 🚧 Known Limitations
-
-- **SIS Integration**: May conflict with SIS-managed enrollments
-- **Cross-listing**: Not compatible with cross-listed courses
-- **Section Limits**: Subject to Canvas platform limits on sections per course
-- **Rollback**: Limited rollback capabilities - use with caution
-
-## 🔧 Development
-
-### Project Structure
-```
-section-mvp/
-├── config/          # Database configuration
-├── models/          # MongoDB schemas
-├── routes/          # API route handlers
-├── services/        # Business logic services
-├── public/          # Frontend assets
-├── server.js        # Main application entry point
-└── package.json     # Dependencies and scripts
+### Local Development
+```bash
+npm run dev
 ```
 
-### Adding New Features
-1. Backend changes go in `services/` and `routes/`
-2. Frontend changes go in `public/`
-3. Database schemas in `models/`
-4. Follow existing error handling patterns
+### Production
+```bash
+npm start
+```
 
-### Environment Variables
-- `PORT`: Server port (default: 3000)
-- `MONGODB_URI`: MongoDB connection string
-- `NODE_ENV`: Environment (development/production)
-- `SESSION_SECRET`: Session encryption key
+### Environment Setup
+```bash
+NODE_ENV=production
+PORT=3000
+INSTITUTION_NAME="Australian Catholic University"
+```
 
-## 📈 Future Enhancements
+## 🔄 Rollback Operations
 
-- **LTI Integration**: Direct Canvas app integration
-- **Advanced Analytics**: Detailed allocation statistics
-- **Bulk Course Support**: Process multiple courses simultaneously
-- **Template Management**: Save and reuse allocation templates
-- **Notification System**: Email notifications for completion
-- **API Rate Optimization**: Smart batching and caching
+### When to Use Rollback
+- Incorrect allocation parameters
+- Need to start over
+- System errors during allocation
+- User requests undo
+
+### Rollback Process
+1. Navigate to execution results
+2. Click "Rollback Allocation"
+3. Confirm the operation
+4. Monitor rollback progress
+5. Verify completion
+
+### What Gets Rolled Back
+- ✅ All sections created in the session
+- ✅ Student enrollments in those sections
+- ❌ Other sections (preserved)
+- ❌ Default sections (preserved)
+
+## 📝 Logging
+
+### Console Logging
+- API call tracking
+- Operation progress
+- Error details
+- Performance metrics
+
+### Canvas Audit Trail
+- Section creation timestamps
+- User attribution via integration_id
+- Session linking for rollback
 
 ## 🤝 Contributing
 
-1. Follow the existing code style and patterns
-2. Add comprehensive error handling
-3. Include logging for debugging
-4. Test with various Canvas configurations
-5. Update documentation for new features
-
-## 📞 Support
-
-For technical issues or questions:
-- Check the application logs in the console
-- Review the Canvas API documentation
-- Ensure proper permissions in Canvas
-- Verify MongoDB connectivity
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## 📄 License
 
-This project is developed for Australian Catholic University. All rights reserved.
+MIT License - see LICENSE file for details
+
+## 🆘 Support
+
+For issues and questions:
+- Check the troubleshooting guide
+- Review Canvas API documentation
+- Contact ACU Education Technology
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: December 2024  
-**Developed for**: Australian Catholic University 
+**Note**: This tool is designed to work exclusively with Canvas LMS and requires no external database setup. All section identification and rollback operations use Canvas-native features for maximum portability and simplicity. 

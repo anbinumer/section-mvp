@@ -149,7 +149,9 @@ router.post('/course-data', createCanvasInstance, async (req, res) => {
           name: s.name,
           course_id: s.course_id,
           total_students: s.total_students || 0,
-          sis_section_id: s.sis_section_id
+          sis_section_id: s.sis_section_id,
+          integration_id: s.integration_id,
+          isToolCreated: req.canvasAPI.isToolCreatedSection(s)
         }))
       },
       analysis,
@@ -173,6 +175,128 @@ router.post('/course-data', createCanvasInstance, async (req, res) => {
     }
   }
 });
+
+// POST /api/canvas/analyze-sections
+// Analyze existing sections to identify tool-created vs other sections
+router.post('/analyze-sections', createCanvasInstance, async (req, res) => {
+  try {
+    const { courseId } = req.body;
+    
+    if (!courseId) {
+      return res.status(400).json({
+        error: 'Course ID is required'
+      });
+    }
+
+    console.log(`🔍 Analyzing sections for course ${courseId}`);
+
+    // Fetch all sections
+    const allSections = await req.canvasAPI.getSections(courseId);
+    
+    // Categorize sections
+    const toolSections = allSections.filter(s => req.canvasAPI.isToolCreatedSection(s));
+    const nonToolSections = allSections.filter(s => !req.canvasAPI.isToolCreatedSection(s));
+    
+    // Analyze potential conflicts
+    const analysis = {
+      total: allSections.length,
+      toolCreated: {
+        count: toolSections.length,
+        sections: toolSections.map(s => ({
+          id: s.id,
+          name: s.name,
+          total_students: s.total_students || 0,
+          sis_section_id: s.sis_section_id,
+          createdBy: s.integration_id ? JSON.parse(s.integration_id).createdBy : 'unknown'
+        }))
+      },
+      otherSections: {
+        count: nonToolSections.length,
+        sections: nonToolSections.map(s => ({
+          id: s.id,
+          name: s.name,
+          total_students: s.total_students || 0,
+          sis_section_id: s.sis_section_id,
+          type: this.categorizeSection(s)
+        }))
+      },
+      warnings: [],
+      recommendations: []
+    };
+
+    // Generate warnings and recommendations
+    if (toolSections.length > 0) {
+      analysis.warnings.push({
+        type: 'existing_tool_sections',
+        message: `${toolSections.length} sections were previously created by this tool`,
+        severity: 'warning',
+        action: 'Consider reviewing existing allocations before creating new sections'
+      });
+    }
+
+    if (nonToolSections.length > 0) {
+      analysis.warnings.push({
+        type: 'other_sections_exist',
+        message: `${nonToolSections.length} sections exist that were not created by this tool`,
+        severity: 'info',
+        action: 'These sections will be preserved and not modified'
+      });
+    }
+
+    // Check for potential naming conflicts
+    const toolSectionNames = toolSections.map(s => s.name.toLowerCase());
+    const nonToolSectionNames = nonToolSections.map(s => s.name.toLowerCase());
+    
+    analysis.recommendations.push({
+      type: 'safe_operation',
+      message: 'Tool will only modify sections it created, preserving all other sections',
+      action: 'Proceed with confidence'
+    });
+
+    res.json({
+      success: true,
+      analysis,
+      apiCalls: req.canvasAPI.getApiCallCount()
+    });
+
+  } catch (error) {
+    console.error('❌ Section analysis error:', error);
+    
+    if (error.canvasError) {
+      res.status(error.status || 400).json({
+        error: 'Canvas API Error',
+        message: error.message,
+        canvasError: true
+      });
+    } else {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: process.env.NODE_ENV === 'production' ? 'Failed to analyze sections' : error.message
+      });
+    }
+  }
+});
+
+// Helper function to categorize non-tool sections
+function categorizeSection(section) {
+  if (section.name.toLowerCase().includes('default')) {
+    return 'default';
+  }
+  if (section.sis_section_id && section.sis_section_id.startsWith('SIS_')) {
+    return 'sis_imported';
+  }
+  if (section.integration_id) {
+    try {
+      const metadata = JSON.parse(section.integration_id);
+      if (metadata.tool) {
+        return `other_tool_${metadata.tool}`;
+      }
+    } catch (e) {
+      // Invalid JSON
+    }
+  }
+  return 'manual';
+}
 
 // POST /api/canvas/test-connection
 // Simple endpoint to test Canvas connectivity

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const AllocationService = require('../services/allocationService');
-const AllocationLog = require('../models/AllocationLog');
 
 // POST /api/allocations/analyze
 // Analyze course data and generate recommendations
@@ -95,25 +94,6 @@ router.post('/execute', async (req, res) => {
 
     console.log(`🚀 Starting allocation execution for course ${courseId}`);
 
-    // Create allocation log
-    const allocationLog = new AllocationLog({
-      canvasCourseId: courseId,
-      userId: userId || 'unknown',
-      userName: userName || 'Unknown User',
-      operation: 'allocate_students',
-      beforeState: {
-        studentCount: plan.totalStudents || plan.sections?.reduce((sum, section) => sum + section.students.length, 0) || 0,
-        facilitatorCount: plan.summary?.facilitatorsAssigned || plan.sections?.filter(s => s.facilitator).length || 0,
-        existingSections: []
-      },
-      parameters: {
-        targetRatio: 25,
-        maxRatio: 50,
-        allocationStrategy: plan.strategy
-      },
-      status: 'failed' // Will be updated on success
-    });
-
     const startTime = Date.now();
 
     try {
@@ -133,7 +113,6 @@ router.post('/execute', async (req, res) => {
           
           await canvasAPI.assignUserAsTeacher(courseId, currentUser.id);
           console.log('✅ Editing Lecturer assigned as Teacher');
-          allocationLog.apiCalls.total += canvasAPI.getApiCallCount();
         } catch (error) {
           console.log(`⚠️ Could not assign Editing Lecturer as Teacher: ${error.message}`);
           // Don't fail the entire operation if this fails
@@ -163,8 +142,6 @@ router.post('/execute', async (req, res) => {
       if (!sectionResults.success || sectionResults.results.failed.length > 0) {
         throw new Error(`Section creation failed: ${sectionResults.results.failed.length} sections failed`);
       }
-
-      allocationLog.apiCalls.total += sectionResults.apiCalls || 0;
 
       // Step 2: Prepare student enrollments
       console.log('👥 Preparing student enrollments...');
@@ -198,22 +175,9 @@ router.post('/execute', async (req, res) => {
           console.log(`❌ Failed to enroll ${studentName}: ${error} (${current}/${total})`);
         }
       });
-      
-      allocationLog.apiCalls.total += canvasAPI.getApiCallCount();
 
-      // Update allocation log
-      allocationLog.afterState = {
-        studentCount: plan.totalStudents || plan.sections?.reduce((sum, section) => sum + section.students.length, 0) || 0,
-        facilitatorCount: plan.summary?.facilitatorsAssigned || plan.sections?.filter(s => s.facilitator).length || 0,
-        sectionsCreated: plan.sections.map(s => s.externalName),
-        studentsAllocated: enrollmentResults.successful.length
-      };
-
-      allocationLog.executionTime = Date.now() - startTime;
-      allocationLog.apiCalls.successful = allocationLog.apiCalls.total;
-      allocationLog.status = 'success';
-
-      await allocationLog.save();
+      const executionTime = Date.now() - startTime;
+      const totalApiCalls = sectionResults.apiCalls + canvasAPI.getApiCallCount();
 
       console.log('✅ Allocation completed successfully');
 
@@ -223,18 +187,13 @@ router.post('/execute', async (req, res) => {
         results: {
           sectionsCreated: sectionResults.results.successful.length,
           studentsEnrolled: enrollmentResults.successful.length,
-          totalApiCalls: allocationLog.apiCalls.total,
-          executionTime: allocationLog.executionTime
+          totalApiCalls: totalApiCalls,
+          executionTime: executionTime
         },
-        logId: allocationLog._id
+        sessionId: sectionResults.sessionId
       });
 
     } catch (executionError) {
-      // Log the error
-      await allocationLog.addError('execution', executionError.message);
-      allocationLog.executionTime = Date.now() - startTime;
-      await allocationLog.markAsFailed(executionError.message);
-      
       throw executionError;
     }
 
@@ -247,89 +206,12 @@ router.post('/execute', async (req, res) => {
   }
 });
 
-// GET /api/allocations/history/:courseId
-// Get allocation history for a course
-router.get('/history/:courseId', async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const limit = parseInt(req.query.limit) || 10;
-    
-    const logs = await AllocationLog.findByCourse(courseId).limit(limit);
-    
-    res.json({
-      success: true,
-      history: logs.map(log => ({
-        id: log._id,
-        operation: log.operation,
-        userName: log.userName,
-        status: log.status,
-        sectionsCreated: log.afterState?.sectionsCreated?.length || 0,
-        studentsAllocated: log.afterState?.studentsAllocated || 0,
-        executionTime: log.executionTime,
-        createdAt: log.createdAt,
-        errors: log.errors
-      }))
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to fetch allocation history:', error);
-    res.status(500).json({
-      error: 'Failed to fetch allocation history',
-      message: error.message
-    });
-  }
-});
-
-// GET /api/allocations/log/:logId
-// Get detailed allocation log
-router.get('/log/:logId', async (req, res) => {
-  try {
-    const { logId } = req.params;
-    
-    const log = await AllocationLog.findById(logId);
-    
-    if (!log) {
-      return res.status(404).json({
-        error: 'Allocation log not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      log: {
-        id: log._id,
-        courseId: log.canvasCourseId,
-        operation: log.operation,
-        user: {
-          id: log.userId,
-          name: log.userName
-        },
-        beforeState: log.beforeState,
-        afterState: log.afterState,
-        parameters: log.parameters,
-        status: log.status,
-        errors: log.errors,
-        executionTime: log.executionTime,
-        apiCalls: log.apiCalls,
-        createdAt: log.createdAt
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to fetch allocation log:', error);
-    res.status(500).json({
-      error: 'Failed to fetch allocation log',
-      message: error.message
-    });
-  }
-});
-
 // GET /api/allocations/health
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'Allocation Management',
+    service: 'Allocation Management (Canvas-Only)',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });

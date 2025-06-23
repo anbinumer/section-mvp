@@ -6,13 +6,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-const connectDB = require('./config/database');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Connect to MongoDB
-connectDB();
 
 // Security middleware
 app.use(helmet({
@@ -78,7 +73,7 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Canvas Section Manager running on port ${PORT}`);
+  console.log(`🚀 Canvas Section Manager (Canvas-Only) running on port ${PORT}`);
   console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🎨 Institution: ${process.env.INSTITUTION_NAME || 'Not specified'}`);
 }); 
