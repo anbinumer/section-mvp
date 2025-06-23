@@ -34,7 +34,14 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? false : true,
+  origin: process.env.NODE_ENV === 'production' 
+    ? [
+        'https://*.vercel.app',
+        'https://*.vercel.app/*',
+        process.env.VERCEL_URL,
+        process.env.VERCEL_URL + '/*'
+      ].filter(Boolean)
+    : true,
   credentials: true
 }));
 
