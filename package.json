@@ -8,19 +8,26 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["canvas", "lms", "section", "allocation", "education"],
+  "keywords": [
+    "canvas",
+    "lms",
+    "section",
+    "allocation",
+    "education"
+  ],
   "author": "ACU Education Technology",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
     "axios": "^1.6.0",
-    "dotenv": "^16.3.1",
+    "basic-auth": "^2.0.1",
     "cors": "^2.8.5",
-    "helmet": "^7.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
+    "helmet": "^7.2.0",
     "morgan": "^1.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   }
-} 
+}
