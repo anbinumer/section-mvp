@@ -60,6 +60,17 @@ app.use('/api/canvas', require('./routes/canvas'));
 app.use('/api/sections', require('./routes/sections'));
 app.use('/api/allocations', require('./routes/allocations'));
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'Canvas Section Manager',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    vercel: !!process.env.VERCEL
+  });
+});
+
 // Serve main application
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -79,8 +90,14 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Canvas Section Manager (Canvas-Only) running on port ${PORT}`);
-  console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🎨 Institution: ${process.env.INSTITUTION_NAME || 'Not specified'}`);
-}); 
+// Only start the server if we're not in a serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Canvas Section Manager (Canvas-Only) running on port ${PORT}`);
+    console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🎨 Institution: ${process.env.INSTITUTION_NAME || 'Not specified'}`);
+  });
+}
+
+// Export the app for Vercel
+module.exports = app; 
