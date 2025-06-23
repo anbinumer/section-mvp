@@ -202,6 +202,53 @@ router.get('/session/:sessionId', async (req, res) => {
   }
 });
 
+// POST /api/sections/move-students
+router.post('/move-students', async (req, res) => {
+  try {
+    const { studentIds, fromSectionId, toSectionId, canvasUrl, apiToken } = req.body;
+    if (!studentIds || !Array.isArray(studentIds) || !fromSectionId || !toSectionId || !canvasUrl || !apiToken) {
+      return res.status(400).json({ error: 'studentIds, fromSectionId, toSectionId, canvasUrl, and apiToken are required' });
+    }
+    const canvasAPI = new CanvasAPI(canvasUrl, apiToken);
+
+    // Fetch both sections to verify they are tool-created
+    const allSections = await canvasAPI.getSectionsByIds([fromSectionId, toSectionId]);
+    const fromSection = allSections.find(s => s.id == fromSectionId);
+    const toSection = allSections.find(s => s.id == toSectionId);
+    if (!fromSection || !toSection) {
+      return res.status(404).json({ error: 'One or both sections not found' });
+    }
+    if (!canvasAPI.isToolCreatedSection(fromSection) || !canvasAPI.isToolCreatedSection(toSection)) {
+      return res.status(403).json({ error: 'Both sections must be tool-created' });
+    }
+
+    // For each student: unenroll from fromSection, enroll in toSection
+    const results = [];
+    for (const studentId of studentIds) {
+      try {
+        // Find the student's enrollment in the fromSection
+        const enrollments = await canvasAPI.getSectionEnrollments(fromSectionId);
+        const studentEnrollment = enrollments.find(e => e.user_id == studentId && e.type === 'StudentEnrollment');
+        if (!studentEnrollment) {
+          results.push({ studentId, status: 'failed', error: 'Not enrolled in fromSection' });
+          continue;
+        }
+        // Unenroll from fromSection
+        await canvasAPI.unenrollStudentFromSection(studentEnrollment.id);
+        // Enroll in toSection
+        await canvasAPI.enrollStudentInSection(toSectionId, studentId);
+        results.push({ studentId, status: 'success' });
+      } catch (err) {
+        results.push({ studentId, status: 'failed', error: err.message });
+      }
+    }
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('❌ Move students error:', error);
+    res.status(500).json({ error: 'Failed to move students', message: error.message });
+  }
+});
+
 // GET /api/sections/health
 router.get('/health', (req, res) => {
   res.json({

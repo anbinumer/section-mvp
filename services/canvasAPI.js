@@ -403,6 +403,28 @@ class CanvasAPI {
   resetApiCallCount() {
     this.apiCallCount = 0;
   }
+
+  /**
+   * Get multiple sections by their IDs (fetch all sections for the course and filter)
+   * @param {Array} sectionIds
+   * @returns {Array}
+   */
+  async getSectionsByIds(sectionIds) {
+    // This method assumes you have access to the courseId in context or as a property
+    // If not, you may need to pass courseId as an argument
+    // For now, fetch all sections for all possible courseIds (since section IDs are unique in Canvas)
+    // We'll fetch each section individually
+    const results = [];
+    for (const id of sectionIds) {
+      try {
+        const response = await this.client.get(`/sections/${id}`);
+        results.push(response.data);
+      } catch (e) {
+        // Ignore not found
+      }
+    }
+    return results;
+  }
 }
 
 module.exports = CanvasAPI;
