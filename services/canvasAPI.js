@@ -195,6 +195,23 @@ class CanvasAPI {
   }
 
   /**
+   * Get enrollments for a specific section
+   */
+  async getSectionEnrollments(sectionId) {
+    try {
+      const response = await this.client.get(`/sections/${sectionId}/enrollments`, {
+        params: {
+          per_page: 100,
+          include: ['user']
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Check if a section was created by our tool
    */
   isToolCreatedSection(section) {

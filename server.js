@@ -82,6 +82,7 @@ console.log('Setting up routes...');
 app.use('/api/canvas', require('./routes/canvas'));
 app.use('/api/sections', require('./routes/sections'));
 app.use('/api/allocations', require('./routes/allocations'));
+app.use('/api/csv', require('./routes/csv'));
 console.log('✅ All routes loaded');
 
 // Health check endpoint
