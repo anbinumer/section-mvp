@@ -128,12 +128,15 @@ router.post('/validate', upload.single('csvFile'), async (req, res) => {
           message = `CSV validation successful: ${result.summary.validRows} valid rows, ${result.summary.warningRows} warnings`;
         }
       } else {
+        console.log(`❌ [DEBUG] CSV validation failed with errors:`, result.validation.errors);
+        console.log(`❌ [DEBUG] Validation summary:`, result.summary);
         message = `CSV validation failed: ${result.summary.errorRows} errors found`;
       }
 
       response.message = message;
       res.json(response);
     } else {
+      console.log(`❌ [DEBUG] CSV parsing failed:`, result.error);
       res.status(400).json({
         success: false,
         error: result.error,
